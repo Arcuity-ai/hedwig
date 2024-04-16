@@ -12,6 +12,17 @@ from datasets.aapd import AAPDCharQuantized as AAPD
 from datasets.imdb import IMDBCharQuantized as IMDB
 from datasets.reuters import ReutersCharQuantized as Reuters
 from datasets.yelp2014 import Yelp2014CharQuantized as Yelp2014
+from datasets.ag_news import AGNewsCharQuantized as AGNews
+from datasets.dbpedia import DBpediaCharQuantized as DBpedia
+from datasets.imdb_torchtext import IMDBTorchtextCharQuantized as IMDBTorchtext
+from datasets.sogou_news import SogouNewsCharQuantized as SogouNews
+from datasets.yahoo_answers import YahooAnswersCharQuantized as YahooAnswers
+from datasets.yelp_review_polarity import YelpReviewPolarityCharQuantized as YelpReviewPolarity
+from datasets.twenty_news import TwentyNewsCharQuantized as TwentyNews
+from datasets.ohsumed import OHSUMEDCharQuantized as OHSUMED
+from datasets.r8 import R8CharQuantized as R8
+from datasets.r52 import R52CharQuantized as R52
+from datasets.trec6 import TREC6CharQuantized as TREC6
 from models.char_cnn.args import get_args
 from models.char_cnn.model import CharCNN
 
@@ -81,7 +92,18 @@ if __name__ == '__main__':
         'Reuters': Reuters,
         'AAPD': AAPD,
         'IMDB': IMDB,
-        'Yelp2014': Yelp2014
+        'Yelp2014': Yelp2014,
+        'AG_NEWS': AGNews,
+        'DBpedia': DBpedia,
+        'IMDB_torchtext': IMDBTorchtext,
+        'SogouNews': SogouNews,
+        'YahooAnswers': YahooAnswers,
+        'YelpReviewPolarity': YelpReviewPolarity,
+        'TwentyNews': TwentyNews,
+        'OHSUMED': OHSUMED,
+        'R8': R8,
+        'R52': R52,
+        'TREC6': TREC6
     }
 
     if args.dataset not in dataset_map:
@@ -89,12 +111,19 @@ if __name__ == '__main__':
 
     else:
         dataset_class = dataset_map[args.dataset]
-        train_iter, dev_iter, test_iter = dataset_class.iters(args.data_dir,
-                                                              args.word_vectors_file,
-                                                              args.word_vectors_dir,
-                                                              batch_size=args.batch_size,
-                                                              device=args.gpu,
-                                                              unk_init=UnknownWordVecCache.unk)
+        iters = dataset_class.iters(args.data_dir,
+                                    args.word_vectors_file,
+                                    args.word_vectors_dir,
+                                    batch_size=args.batch_size,
+                                    device=args.gpu,
+                                    unk_init=UnknownWordVecCache.unk)
+
+        # Some datasets (e.g. AG_NEWS) only have train and test splits
+        if len(iters) == 2:
+            train_iter, test_iter = iters
+            dev_iter = test_iter
+        else:
+            train_iter, dev_iter, test_iter = iters
 
     config = deepcopy(args)
     config.dataset = train_iter.dataset
@@ -103,7 +132,7 @@ if __name__ == '__main__':
     print('Dataset:', args.dataset)
     print('No. of target classes:', train_iter.dataset.NUM_CLASSES)
     print('No. of train instances', len(train_iter.dataset))
-    print('No. of dev instances', len(dev_iter.dataset))
+    print('No. of dev instances', len(dev_iter.dataset) if dev_iter else 0)
     print('No. of test instances', len(test_iter.dataset))
 
     if args.resume_snapshot:
@@ -163,9 +192,10 @@ if __name__ == '__main__':
     if hasattr(trainer, 'snapshot_path'):
         model = torch.load(trainer.snapshot_path)
 
-    evaluate_dataset('dev', dataset_map[args.dataset], model, None, dev_iter, args.batch_size,
-                     is_multilabel=dataset_class.IS_MULTILABEL,
-                     device=args.gpu)
+    if dev_iter:
+        evaluate_dataset('dev', dataset_map[args.dataset], model, None, dev_iter, args.batch_size,
+                         is_multilabel=dataset_class.IS_MULTILABEL,
+                         device=args.gpu)
     evaluate_dataset('test', dataset_map[args.dataset], model, None, test_iter, args.batch_size,
                      is_multilabel=dataset_class.IS_MULTILABEL,
                      device=args.gpu)
