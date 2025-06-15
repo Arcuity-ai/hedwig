@@ -6,3 +6,4 @@ scipy==1.11.1
 torchtext==0.2.3
 transformers==4.38.0
 master
+requests>=2.32.4 # not directly required, pinned by Snyk to avoid a vulnerability
